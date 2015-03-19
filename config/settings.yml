@@ -1,0 +1,11 @@
+---
+rabbitmq:
+  url: "amqp://guest:guest@localhost"
+
+box_connector:
+  client_id: fill-in
+  client_secret: fill-in
+
+aws_s3:
+  secret_access_key: fill-in
+  access_key_id: fill-in
