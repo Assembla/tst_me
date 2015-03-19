@@ -1,7 +1,4 @@
 # -*- encoding: utf-8 -*-
-# require 'logger'
-# require "ruby-box"
-# require "box_api"
 
 class BoxRemoteSyncProcessor < BaseProcessor
 
@@ -10,17 +7,17 @@ class BoxRemoteSyncProcessor < BaseProcessor
     @event = event
 
     begin
-      case event[:routing_key]
+      case metadata.routing_key
         when "box_connector.sync.full.requested"
           do_remote_full_sync_request(event)
         when "box_connector.sync.delta.requested"
           do_remote_delta_sync_request(event)
         else
-          logger.info("Unknown routing key received: #{event[:routing_key]}")
+          logger.info("Unknown routing key received: #{metadata.routing_key}")
       end
     rescue RubyBox::AuthError => ex
       # enqueue token refresh event
-      resubmit_event(event, event[:routing_key])
+      resubmit_event(event, metadata.routing_key)
     end
   end
 
