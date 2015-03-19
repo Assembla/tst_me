@@ -5,7 +5,6 @@ gem 'activesupport', '3.2.21'
 gem "bunny", ">= 1.7.0"
 gem "ruby-box"
 gem "configatron"
-gem "ya2yaml"
 gem "yamler"
 gem "json"
 gem "right_aws"

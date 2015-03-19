@@ -1,7 +1,7 @@
 require 'singleton'
 
 class MQConnection
-  include Singleton
+  # include Singleton
 
   attr_accessor :connection, :channel, :exchange
 
@@ -13,8 +13,8 @@ class MQConnection
   end
 
   def subscribe(queue, opts)
-    @channel.queue(queue).bind(@exchange, opts).subscribe(:block => true) do |delivery_info, metadata, payload|
-      yield delivery_info, metadata, payload
+    @channel.queue(queue).bind(@exchange, opts).subscribe(opts.merge(:block => true)) do |delivery_info, metadata, payload|
+      yield delivery_info, payload
     end
   end
 
