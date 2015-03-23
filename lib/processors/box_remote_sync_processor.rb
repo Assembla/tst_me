@@ -34,7 +34,11 @@ class BoxRemoteSyncProcessor < BaseProcessor
     event[:connector][:cursor] = Time.now.to_i * 1000 # box cursor is represented in milliseconds.
     event[:entries] = result
 
-    MQConnection.instance.publish(event, {:routing_key => "box_connector.sync.full.succeed"}) if result.size > 0
+    mq_connection.publish(event, {:routing_key => "box_connector.sync.full.succeed"}) if result.size > 0
+  end
+
+  def mq_connection
+    @connection ||= MQConnection.new
   end
 
   def do_remote_delta_sync_request(event)
@@ -60,7 +64,7 @@ class BoxRemoteSyncProcessor < BaseProcessor
     #   do_event_tracking(last_event)
     # end
 
-    MQConnection.instance.publish(event, {:routing_key => "box_connector.sync.delta.succeed"}) if result.size > 0
+    mq_connection.publish(event, {:routing_key => "box_connector.sync.delta.succeed"}) if result.size > 0
   end
 
   def reject_non_connector_events(events, connector_path)
@@ -106,7 +110,7 @@ class BoxRemoteSyncProcessor < BaseProcessor
 
   def resubmit_event(event, routing_key)
     event[:errors] = "refresh_token"
-    MQConnection.instance.publish(event, {:routing_key => routing_key.gsub("requested", "oauth_failed")})
+    mq_connection.publish(event, {:routing_key => routing_key.gsub("requested", "oauth_failed")})
   end
 
   def walk(connector_path, parent_id, result)
@@ -152,7 +156,8 @@ class BoxRemoteSyncProcessor < BaseProcessor
 
   def folder_node(full_path, item, parent_id)
     {
-      id: item.id,
+      external_id: item.id,
+      external_parent_id: parent_id,
       name: item.name,
       full_path: full_path,
       is_dir: true,
@@ -162,7 +167,6 @@ class BoxRemoteSyncProcessor < BaseProcessor
       deleted_at: item.trashed_at || item.purged_at,
       created_by: {id: item.created_by.id, name: item.created_by.name, login: item.created_by.login},
       updated_by: {id: item.modified_by.id, name: item.modified_by.name, login: item.modified_by.login},
-      parent_id: parent_id
     }
   end
 
