@@ -30,8 +30,7 @@ class Consumer
       puts "Consumer stopped."
       exit(0)
     ensure
-      mq_connection.connection.close
+      mq_connection.connection.close if mq_connection && mq_connection.connection
     end
   end
-
 end
