@@ -17,11 +17,17 @@ class BoxRemoteSyncProcessor < BaseProcessor
       end
     rescue RubyBox::AuthError => ex
       # enqueue token refresh event
+      invalidate_box_credentials
       resubmit_event(event, metadata.routing_key)
     end
   end
 
   private
+
+  def invalidate_box_credentials
+    @client = nil
+    @box_session = nil
+  end
 
   def do_remote_full_sync_request(event)
     connector_path = event[:connector][:path]
