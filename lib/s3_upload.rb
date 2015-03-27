@@ -1,5 +1,4 @@
 # -*- encoding : utf-8 -*-
-# require "right_aws"
 
 class S3Upload
   attr_reader :s3, :bucket, :box_token, :link_expires_in, :size_for_multipart, :part_size, :logger
@@ -21,7 +20,6 @@ class S3Upload
   # params = [{:key => key, :bucket => bucket, :id => box_file_id}, .., {...}]
   # returns true on success
   def send_files(params)
-    puts "zzzz"
     params.each { |param| store_object(param) }
     true
   end

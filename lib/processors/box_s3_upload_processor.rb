@@ -14,7 +14,7 @@ class BoxS3UploadProcessor < BaseProcessor
       end
     rescue RubyBox::AuthError => ex
       # enqueue token refresh event
-      resubmit_event(event, event[:routing_key])
+      resubmit_event(event, metadata.routing_key)
     end
   end
 
