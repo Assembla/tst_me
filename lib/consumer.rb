@@ -23,7 +23,7 @@ class Consumer
           end
         rescue => ex
           puts "\nError:\n #{ex.backtrace.join("\n")}"
-          sleep(3)
+          sleep(5)
         end
       end
     rescue Interrupt
