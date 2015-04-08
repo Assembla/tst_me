@@ -3,14 +3,18 @@ require "s3_upload"
 
 class BoxS3UploadProcessor < BaseProcessor
 
+  def initialize
+    @upload_s3 = S3Upload.new(configatron.aws_s3.access_key_id, configatron.aws_s3.secret_access_key)
+  end
+
   def on_message(event)
     logger.debug("#{self.class.name} received: #{event.inspect}")
 
     begin
       upload_list = upload_list(event)
       unless upload_list.blank?
-        upload_s3 = S3Upload.new(configatron.aws_s3.access_key_id, configatron.aws_s3.secret_access_key, event[:oauth_token])
-        upload_s3.send_files(upload_list)
+        @upload_s3.box_token = event[:oauth_token]
+        @upload_s3.send_files(upload_list)
       end
     rescue RubyBox::AuthError => ex
       # enqueue token refresh event
@@ -33,7 +37,11 @@ class BoxS3UploadProcessor < BaseProcessor
 
   def resubmit_event(event, routing_key)
     event[:errors] = "refresh_token"
-    MQConnection.instance.publish(event, {routing_key: routing_key.gsub("requested", "oauth_failed")})
+    mq_connection.publish(event, {routing_key: routing_key.gsub("requested", "oauth_failed")})
+  end
+
+  def mq_connection
+    @connection ||= MQConnection.new
   end
 
 end

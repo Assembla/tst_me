@@ -54,11 +54,13 @@ class BoxRemoteSyncProcessor < BaseProcessor
     events_response = client.event_response(cursor.to_i, :changes)
     events = reject_non_connector_events(events_response.events, event[:connector][:path])
     sorted_events = compress_events(events)
-
+    external_event_ids = event[:connector][:external_event_ids]
+    event[:connector][:external_event_ids] = []
     sorted_events.each do |item_id, last_event|
-      if last_event
+      if last_event && (external_event_ids.blank? || !external_event_ids.include?(last_event.event_id))
         node = get_node_metadata(event, last_event)
         result << node if node
+        event[:connector][:external_event_ids] << last_event.event_id
       end
     end
 
