@@ -32,14 +32,13 @@ class BoxRemoteSyncProcessor < BaseProcessor
   def do_remote_full_sync_request(event)
     connector_path = event[:connector][:path]
     result = []
-    if event[:connector] && event[:connector][:tracked_item_id]
-      item_id = event[:connector][:tracked_item_id]
+    if event[:connector] && event[:connector][:external_item_id]
+      item_id = event[:connector][:external_item_id]
       walk(connector_path, item_id, result)
     end
 
     event[:connector][:cursor] = Time.now.to_i * 1000 # box cursor is represented in milliseconds.
     event[:entries] = result
-
     mq_connection.publish(event, {:routing_key => "box_connector.sync.full.succeed"}) if result.size > 0
   end
 
