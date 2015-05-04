@@ -4,7 +4,7 @@ require "s3_upload"
 class BoxS3UploadProcessor < BaseProcessor
 
   def initialize
-    @upload_s3 = S3Upload.new(configatron.aws_s3.access_key_id, configatron.aws_s3.secret_access_key)
+    @upload_s3 = S3Upload.new(configatron.aws_s3.access_key_id, configatron.aws_s3.secret_access_key, {logger: logger})
   end
 
   def on_message(event)
@@ -14,7 +14,8 @@ class BoxS3UploadProcessor < BaseProcessor
       upload_list = upload_list(event)
       unless upload_list.blank?
         @upload_s3.box_token = event[:oauth_token]
-        @upload_s3.send_files(upload_list)
+        success, failures = @upload_s3.send_files(upload_list)
+        publish_results(event, success, failures)
       end
     rescue RubyBox::AuthError => ex
       # enqueue token refresh event
@@ -24,12 +25,23 @@ class BoxS3UploadProcessor < BaseProcessor
 
   private
 
+  def publish_results(event, success_files, failed_files)
+    unless success_files.blank?
+      event[:entries] = success_files
+      mq_connection.publish(event, {routing_key: "box_connector.sync.s3.succeed"})
+    end
+    unless failed_files.blank?
+      event[:errors] = failed_files
+      mq_connection.publish(event, {routing_key: "box_connector.sync.s3.failed"})
+    end
+  end
+
   def upload_list(event)
     file_list = []
     event_files = event[:files]
     if event_files
       event_files.each do |key, file_meta|
-        file_list << {key: key, bucket: event[:bucket], id: file_meta[:external_id]}
+        file_list << {key: key, bucket: event[:bucket], id: file_meta[:id], box_id: file_meta[:external_id], index: file_meta[:index]}
       end
     end
     file_list

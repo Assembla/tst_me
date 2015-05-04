@@ -12,6 +12,7 @@ require "processors/base_processor"
 
 def load_config(path)
   configatron.configure_from_hash(Yamler.load(path))
+  configatron.hostname = Socket.gethostname
 end
 
 load_config(File.join("config", "settings.yml"))
