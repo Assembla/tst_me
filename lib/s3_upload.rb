@@ -13,34 +13,82 @@ class S3Upload
 
   # send files to S3
   # params = [{:key => key, :bucket => bucket, :id => box_file_id}, .., {...}]
-  # returns true on success
+  # returns list of successfully uploaded files and list of failed to upload files with related errors
   def send_files(params)
-    params.each { |param| store_object(param) }
-    logger.info("Done.")
-    true
+    failed_list = []
+    success_list = []
+    params.each do |param|
+      process_file(failed_list, success_list, param)
+    end
+    logger.info('Done.')
+    return success_list, failed_list
   end
 
   private
 
+  def process_file(failed_list, success_list, param)
+    box_file = client.file_by_id(param[:box_id])
+    file_node_id = param[:id]
+    index_file = nil
+    path = nil
+    begin
+      if param[:index]
+        path = tmp_path
+        index_file = File.new(path, 'wb+') if path
+      end
+      store_object(box_file, index_file, param[:key], param[:bucket])
+      publish_index_event({id: file_node_id, path: path}) if param[:index]
+      success_list << file_node_id
+    rescue => ex
+      logger.error("failed to upload box file: #{param.inspect}")
+      logger.error(ex.message)
+      logger.error(ex.backtrace.join("\n"))
+      failed_list << {id: file_node_id, error: ex.message}
+    end
+  end
+
   # store object to S3
   # will use multipart API if file size is > than size_for_multipart
-  def store_object(params)
-    #todo: make a map of erros by file_id
-    box_file = client.file_by_id(params[:id])
+  def store_object(box_file, index_file, object_key, bucket)
+    logger.info("uploading: #{bucket}/#{object_key}")
     is_multipart = box_file.size > @size_for_multipart
-    open(box_file.download_url) do |io|
-      options = {
-        key: params[:key],
-        bucket: params[:bucket],
-        data: io
-      }.tap do |memo|
-        memo.update(part_size: @part_size) if is_multipart
-      end
+    io = box_file.stream
+    io = save_copy(index_file, io) if index_file
 
-      logger.info("uploading: #{params[:bucket]}/#{params[:key]}")
-      method = is_multipart ? :store_object_multipart : :store_object
-      @s3.send(method, options)
+    options = {
+      key: object_key,
+      bucket: bucket,
+      data: io
+    }.tap do |memo|
+      memo.update(part_size: @part_size) if is_multipart
     end
+
+    method = is_multipart ? :store_object_multipart : :store_object
+    @s3.send(method, options)
+    index_file.close if index_file
+  end
+
+  def save_copy(index_file, io)
+    while (chunk = io.read(@part_size)) do
+      index_file.write chunk
+    end
+    index_file.rewind
+    index_file
+  end
+
+  def tmp_path
+    tmp_path = nil
+    Dir::Tmpname.create('RackMultipart') { |p| tmp_path = p }
+    tmp_path
+  end
+
+  def publish_index_event(event)
+    logger.info("send indexing event: #{event}")
+    mq_connection.publish(event, {routing_key: "breakout.file_connector_node.upload.#{configatron.hostname}"})
+  end
+
+  def mq_connection
+    @connection ||= MQConnection.new
   end
 
   def box_session
