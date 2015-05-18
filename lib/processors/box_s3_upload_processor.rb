@@ -19,6 +19,9 @@ class BoxS3UploadProcessor < BaseProcessor
       end
     rescue RubyBox::AuthError => ex
       # enqueue token refresh event
+      logger.info("Exception: #{ex}")
+      logger.info(ex.backtrace.join("\n"))
+      invalidate_box_credentials
       resubmit_event(event, metadata.routing_key)
     end
   end
@@ -45,6 +48,11 @@ class BoxS3UploadProcessor < BaseProcessor
       end
     end
     file_list
+  end
+
+  def invalidate_box_credentials
+    @client = nil
+    @box_session = nil
   end
 
   def resubmit_event(event, routing_key)

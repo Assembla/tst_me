@@ -9,6 +9,10 @@ class MQConnection
     @connection ||= Bunny.new(configatron.rabbitmq.url, {automatic_recovery: true, recover_from_connection_close: true})
     @connection.start
     @channel ||= @connection.create_channel
+    @channel.on_uncaught_exception do |e, consumer|
+      puts e.backtrace.join("\n")
+      raise e
+    end
     @exchange ||= @channel.topic("amq.topic")
   end
 
