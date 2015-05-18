@@ -27,11 +27,11 @@ class S3Upload
   private
 
   def process_file(failed_list, success_list, param)
-    box_file = client.file_by_id(param[:box_id])
-    file_node_id = param[:id]
-    index_file = nil
-    path = nil
     begin
+      box_file = client.file_by_id(param[:box_id])
+      file_node_id = param[:id]
+      index_file = nil
+      path = nil
       if param[:index]
         path = tmp_path
         index_file = File.new(path, 'wb+') if path
@@ -39,6 +39,13 @@ class S3Upload
       store_object(box_file, index_file, param[:key], param[:bucket])
       publish_index_event({id: file_node_id, path: path}) if param[:index]
       success_list << file_node_id
+    rescue RubyBox::AuthError => ex
+      invalidate_box_credentials
+      logger.info("Box Auth failed, raising exception to submit event for refresh token")
+      logger.info(ex.message)
+      logger.error(ex.backtrace.join("\n"))
+      # raising the auth error exception in order to send the refresh token event from BoxS3UploadProcessor
+      raise ex
     rescue => ex
       logger.error("failed to upload box file: #{param.inspect}")
       logger.error(ex.message)
@@ -85,6 +92,11 @@ class S3Upload
   def publish_index_event(event)
     logger.info("send indexing event: #{event}")
     mq_connection.publish(event, {routing_key: "breakout.file_connector_node.upload.#{configatron.hostname}"})
+  end
+
+  def invalidate_box_credentials
+    @client = nil
+    @box_session = nil
   end
 
   def mq_connection
